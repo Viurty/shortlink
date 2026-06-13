@@ -26,13 +26,13 @@ const (
 
 func New(ctx context.Context, dsn string) (*Database, error) {
 	db, err := sqlx.ConnectContext(ctx, "pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("postgres connect: %w", err)
+	}
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(2 * time.Minute)
-	if err != nil {
-		return nil, fmt.Errorf("postgres connect: %w", err)
-	}
 	return &Database{db: db}, nil
 }
 
