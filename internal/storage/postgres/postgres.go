@@ -19,9 +19,11 @@ type Database struct {
 }
 
 const (
-	insertLinkQuery      = `INSERT INTO links (code, original_url) VALUES ($1, $2)`
-	selectCodeByOriginal = `SELECT code FROM links WHERE original_url = $1`
-	selectOriginalByCode = `SELECT original_url FROM links WHERE code = $1`
+	insertLinkQuery             = `INSERT INTO links (code, original_url) VALUES ($1, $2)`
+	selectCodeByOriginal        = `SELECT code FROM links WHERE original_url = $1`
+	selectOriginalByCode        = `SELECT original_url FROM links WHERE code = $1`
+	originalURLUniqueConstraint = "links_original_url_key"
+	originalURLColumnName       = "original_url"
 )
 
 func New(ctx context.Context, dsn string) (*Database, error) {
@@ -46,7 +48,7 @@ func (d *Database) Save(ctx context.Context, code, originalURL string) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				if pgErr.ConstraintName == "links_original_url_key" {
+				if pgErr.ConstraintName == originalURLUniqueConstraint || pgErr.ColumnName == originalURLColumnName {
 					return storage.ErrURLConflict
 				}
 				return storage.ErrCodeConflict

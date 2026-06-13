@@ -5,9 +5,9 @@ import (
 	"shortlink/internal/handler"
 )
 
-func New(h *handler.Handler) http.Handler {
+func New(h handler.API) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/shorten", h.Shorten)
-	mux.HandleFunc("GET /api/{short}", h.GetOriginal)
+	mux.HandleFunc("GET /api/expand/{short}", h.GetOriginal)
 	return mux
 }

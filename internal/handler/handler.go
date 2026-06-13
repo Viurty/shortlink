@@ -1,17 +1,30 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"shortlink/internal/service"
+	"net/url"
+	"shortlink/internal/storage"
 	"strings"
 )
 
-type Handler struct {
-	svc *service.Service
+type Shortener interface {
+	GetShort(ctx context.Context, originalURL string) (string, error)
+	GetOriginal(ctx context.Context, code string) (string, error)
 }
 
-func New(svc *service.Service) *Handler {
+type API interface {
+	Shorten(w http.ResponseWriter, r *http.Request)
+	GetOriginal(w http.ResponseWriter, r *http.Request)
+}
+
+type Handler struct {
+	svc Shortener
+}
+
+func New(svc Shortener) *Handler {
 	return &Handler{svc: svc}
 }
 
@@ -26,11 +39,17 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if strings.TrimSpace(req.URL) == "" {
+	originalURL := strings.TrimSpace(req.URL)
+	if originalURL == "" {
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	code, err := h.svc.GetShort(ctx, req.URL)
+	parsedURL, err := url.ParseRequestURI(originalURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
+		writeError(w, http.StatusBadRequest, "invalid url")
+		return
+	}
+	code, err := h.svc.GetShort(ctx, originalURL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -44,15 +63,19 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetOriginal(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	code := r.PathValue("short")
-	url, err := h.svc.GetOriginal(ctx, code)
+	originalURL, err := h.svc.GetOriginal(ctx, code)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "short code not found")
+		if errors.Is(err, storage.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "short code not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"url": url})
+	json.NewEncoder(w).Encode(map[string]string{"url": originalURL})
 }
 
 func writeError(w http.ResponseWriter, status int, errMessage string) {

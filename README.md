@@ -36,10 +36,10 @@ curl -X POST http://localhost:8080/api/shorten \
 
 ### 2. Получить оригинальный URL
 
-`GET /api/{short}`
+`GET /api/expand/{short}`
 
 ```bash
-curl -X GET http://localhost:8080/api/{short}
+curl -X GET http://localhost:8080/api/expand/{short}
 ```
 
 Ответ:
