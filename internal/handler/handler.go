@@ -62,8 +62,3 @@ func writeError(w http.ResponseWriter, status int, errMessage string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": errMessage})
 }
-
-func wantsJSON(r *http.Request) bool {
-	accept := r.Header.Get("Accept")
-	return strings.Contains(accept, "application/json")
-}
