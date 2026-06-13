@@ -10,7 +10,7 @@ import (
 
 const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 const codeLen = 10
-const maxRetries = 5
+const maxRetries = 100
 
 type Service struct {
 	storage storage.Storage
