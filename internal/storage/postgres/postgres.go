@@ -17,6 +17,12 @@ type Database struct {
 	db *sqlx.DB
 }
 
+const (
+	insertLinkQuery      = `INSERT INTO links (code, original_url) VALUES ($1, $2)`
+	selectCodeByOriginal = `SELECT code FROM links WHERE original_url = $1`
+	selectOriginalByCode = `SELECT original_url FROM links WHERE code = $1`
+)
+
 func New(ctx context.Context, dsn string) (*Database, error) {
 	db, err := sqlx.ConnectContext(ctx, "pgx", dsn)
 	if err != nil {
@@ -30,11 +36,7 @@ func (d *Database) Close() error {
 }
 
 func (d *Database) Save(ctx context.Context, code, originalURL string) error {
-	query := `
-        INSERT INTO links (code, original_url)
-        VALUES ($1, $2)
-    `
-	_, err := d.db.ExecContext(ctx, query, code, originalURL)
+	_, err := d.db.ExecContext(ctx, insertLinkQuery, code, originalURL)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -45,15 +47,14 @@ func (d *Database) Save(ctx context.Context, code, originalURL string) error {
 				return storage.ErrCodeConflict
 			}
 		}
-		return fmt.Errorf("сохранение: %w", err)
+		return fmt.Errorf("save: %w", err)
 	}
 	return nil
 }
 
 func (d *Database) GetByOriginal(ctx context.Context, originalURL string) (string, error) {
 	var code string
-	query := `SELECT code FROM links WHERE original_url = $1`
-	err := d.db.GetContext(ctx, &code, query, originalURL)
+	err := d.db.GetContext(ctx, &code, selectCodeByOriginal, originalURL)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", storage.ErrNotFound
 	}
@@ -65,8 +66,7 @@ func (d *Database) GetByOriginal(ctx context.Context, originalURL string) (strin
 
 func (d *Database) GetByCode(ctx context.Context, code string) (string, error) {
 	var originalURL string
-	query := `SELECT original_url FROM links WHERE code = $1`
-	err := d.db.GetContext(ctx, &originalURL, query, code)
+	err := d.db.GetContext(ctx, &originalURL, selectOriginalByCode, code)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", storage.ErrNotFound
 	}

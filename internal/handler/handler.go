@@ -41,7 +41,7 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"code": code})
 }
 
-func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetOriginal(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	code := r.PathValue("short")
 	url, err := h.svc.GetOriginal(ctx, code)

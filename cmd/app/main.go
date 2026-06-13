@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"shortlink/internal/handler"
 	"shortlink/internal/router"
 	"shortlink/internal/service"
 	"shortlink/internal/storage"
 	"shortlink/internal/storage/inmemory"
 	"shortlink/internal/storage/postgres"
+	"syscall"
 	"time"
 )
 
@@ -22,7 +25,7 @@ const (
 func main() {
 	storageType := os.Getenv("STORAGE")
 	if storageType == "" {
-		log.Fatal("STORAGE не установлен")
+		log.Fatal("STORAGE is not set")
 	}
 
 	var store storage.Storage
@@ -31,20 +34,20 @@ func main() {
 	case storagePostgres:
 		dsn := os.Getenv("DSN")
 		if dsn == "" {
-			log.Fatal("DSN не установлен")
+			log.Fatal("DSN is not set")
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		db, err := postgres.New(ctx, dsn)
 		if err != nil {
-			log.Fatalf("ошибка подключения к postgres: %v", err)
+			log.Fatalf("postgres connection failed: %v", err)
 		}
 		defer db.Close()
 
 		err = postgres.Migrate(dsn)
 		if err != nil {
-			log.Fatalf("ошибка создания таблицы: %v", err)
+			log.Fatalf("migration failed: %v", err)
 		}
 		store = db
 
@@ -52,15 +55,37 @@ func main() {
 		store = inmemory.New()
 
 	default:
-		log.Fatalf("неизвестный тип хранилища: %s", storageType)
+		log.Fatalf("unknown storage type: %s", storageType)
 	}
 
-	svc := service.New(store)
-	handler := handler.New(svc)
-	router := router.New(handler)
+	s := service.New(store)
+	h := handler.New(s)
+	r := router.New(h)
 
-	log.Println("сервер запущен на :8080")
-	if err := http.ListenAndServe(":8080", router); err != nil {
-		log.Fatalf("ошибка запуска сервера: %v", err)
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      r,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Println("server is running on :8080")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server start failed: %v", err)
+		}
+	}()
+
+	<-stop
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("server shutdown failed: %v", err)
 	}
 }

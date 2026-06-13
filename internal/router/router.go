@@ -8,6 +8,6 @@ import (
 func New(h *handler.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/shorten", h.Shorten)
-	mux.HandleFunc("GET /api/{short}", h.Redirect)
+	mux.HandleFunc("GET /api/{short}", h.GetOriginal)
 	return mux
 }

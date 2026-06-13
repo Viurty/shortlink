@@ -20,6 +20,10 @@ func New() *Store {
 }
 
 func (s *Store) Save(ctx context.Context, code, originalURL string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -36,6 +40,10 @@ func (s *Store) Save(ctx context.Context, code, originalURL string) error {
 }
 
 func (s *Store) GetByOriginal(ctx context.Context, originalURL string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -47,6 +55,10 @@ func (s *Store) GetByOriginal(ctx context.Context, originalURL string) (string, 
 }
 
 func (s *Store) GetByCode(ctx context.Context, code string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
